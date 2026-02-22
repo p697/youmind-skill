@@ -5,11 +5,11 @@ Each question opens a fresh browser context, asks once, then exits.
 """
 
 import argparse
-from collections import Counter
+import re
 import sys
 import time
 from pathlib import Path
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 from patchright.sync_api import sync_playwright
 
@@ -20,10 +20,12 @@ from auth_manager import AuthManager
 from board_manager import BoardLibrary
 from browser_utils import BrowserFactory, StealthUtils
 from config import (
+    QUERY_TIMEOUT_SECONDS,
     QUERY_INPUT_SELECTORS,
     RESPONSE_SELECTORS,
     SEND_BUTTON_SELECTORS,
     THINKING_SELECTORS,
+    USER_MESSAGE_SELECTORS,
     YOUMIND_BOARD_URL_PREFIX,
 )
 
@@ -34,22 +36,148 @@ FOLLOW_UP_REMINDER = (
 )
 
 
-def _collect_responses(page) -> List[str]:
-    """Collect response texts from the first matching selector in DOM order."""
-    for selector in RESPONSE_SELECTORS:
+def _normalize_text(text: str) -> str:
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def _is_same_question(user_text: str, question: str) -> bool:
+    """Robust match between rendered user message and the submitted question."""
+    user_norm = _normalize_text(user_text)
+    question_norm = _normalize_text(question)
+
+    if not user_norm or not question_norm:
+        return False
+    if question_norm in user_norm:
+        return True
+
+    # Strong signal: long alnum token (e.g., request IDs, explicit markers).
+    strong_tokens = re.findall(r"[A-Za-z0-9_-]{5,}", question_norm)
+    for token in strong_tokens:
+        if token in user_norm:
+            return True
+
+    # Fallback for punctuation/formatting drift.
+    user_compact = re.sub(r"[^A-Za-z0-9\u4e00-\u9fff]+", "", user_norm).lower()
+    question_compact = re.sub(r"[^A-Za-z0-9\u4e00-\u9fff]+", "", question_norm).lower()
+    if not user_compact or not question_compact:
+        return False
+    if question_compact in user_compact:
+        return True
+    if len(question_compact) >= 10 and question_compact[-10:] in user_compact:
+        return True
+
+    return False
+
+
+def _looks_like_metadata_json(text: str) -> bool:
+    compact = _normalize_text(text).lower()
+    return (
+        "\"name\"" in compact
+        and "\"description\"" in compact
+        and "\"topics\"" in compact
+    )
+
+
+def _question_requests_json(question: str) -> bool:
+    q = _normalize_text(question).lower()
+    return "json" in q or "结构化" in q or "严格输出" in q
+
+
+def _collect_messages(
+    page,
+    selectors: List[str],
+    id_attrs: List[str],
+    require_id: bool = False,
+) -> List[Dict[str, str]]:
+    """Collect message-like nodes from the first matching selector in DOM order."""
+    for selector in selectors:
         try:
             elements = page.query_selector_all(selector)
-            selector_texts: List[str] = []
-            for el in elements:
-                text = el.inner_text().strip()
-                if text:
-                    selector_texts.append(text)
-            if selector_texts:
-                return selector_texts
+            selector_messages: List[Dict[str, str]] = []
+
+            for idx, el in enumerate(elements):
+                text = _normalize_text(el.inner_text() or "")
+                if not text:
+                    continue
+
+                msg_id = ""
+                for attr in id_attrs:
+                    value = el.get_attribute(attr)
+                    if value:
+                        msg_id = value
+                        break
+                if require_id and not msg_id:
+                    continue
+                if not msg_id:
+                    msg_id = f"{selector}:{idx}"
+
+                selector_messages.append({"id": msg_id, "text": text})
+
+            if selector_messages:
+                return selector_messages
         except Exception:
             continue
 
     return []
+
+
+def _collect_responses(page) -> List[Dict[str, str]]:
+    """Collect assistant response nodes."""
+    return _collect_messages(
+        page,
+        RESPONSE_SELECTORS,
+        ["data-pick-selection-message-id", "data-message-id"],
+        require_id=True,
+    )
+
+
+def _collect_user_messages(page) -> List[Dict[str, str]]:
+    """Collect user message nodes."""
+    return _collect_messages(
+        page,
+        USER_MESSAGE_SELECTORS,
+        ["data-message-id", "data-pick-selection-message-id"],
+        require_id=True,
+    )
+
+
+def _collect_conversation_sequence(page) -> List[Dict[str, str]]:
+    """Collect user/assistant messages in DOM order."""
+    selector = (
+        "div.ym-ask-user-content[data-user-message='true'][data-message-id], "
+        "div.ym-ask-user-content[data-message-id], "
+        "div.ym-askai-container[data-pick-selection-message-id], "
+        "div.ym-askai-container[data-message-id]"
+    )
+    sequence: List[Dict[str, str]] = []
+
+    try:
+        elements = page.query_selector_all(selector)
+    except Exception:
+        return sequence
+
+    for el in elements:
+        try:
+            text = _normalize_text(el.inner_text() or "")
+            if not text:
+                continue
+
+            class_name = el.get_attribute("class") or ""
+            is_assistant = "ym-askai-container" in class_name
+            msg_type = "assistant" if is_assistant else "user"
+
+            msg_id = (
+                el.get_attribute("data-pick-selection-message-id")
+                or el.get_attribute("data-message-id")
+            )
+            if not msg_id:
+                continue
+
+            sequence.append({"type": msg_type, "id": msg_id, "text": text})
+        except Exception:
+            continue
+
+    return sequence
 
 
 def _is_thinking(page) -> bool:
@@ -75,7 +203,12 @@ def _find_input_selector(page) -> Optional[str]:
     return None
 
 
-def ask_youmind(question: str, board_url: str, headless: bool = True) -> Optional[str]:
+def ask_youmind(
+    question: str,
+    board_url: str,
+    headless: bool = True,
+    timeout_seconds: int = QUERY_TIMEOUT_SECONDS,
+) -> Optional[str]:
     """Send a question to a Youmind board chat and return the answer."""
     auth = AuthManager()
     if not auth.is_authenticated():
@@ -101,10 +234,17 @@ def ask_youmind(question: str, board_url: str, headless: bool = True) -> Optiona
             print("  ❌ Redirected to sign-in. Authentication may be expired.")
             return None
 
-        # Snapshot previous latest response to ensure we only return new output.
-        previous_responses = _collect_responses(page)
-        previous_last_response = previous_responses[-1] if previous_responses else None
-        previous_counts = Counter(previous_responses)
+        # Snapshot previous conversation to ensure we only return post-submit output.
+        previous_sequence = _collect_conversation_sequence(page)
+        previous_user_ids = [
+            msg["id"] for msg in previous_sequence if msg.get("type") == "user"
+        ]
+        baseline_max_user_id = max(previous_user_ids) if previous_user_ids else ""
+        previous_assistant_text_set = {
+            msg["text"] for msg in previous_sequence if msg.get("type") == "assistant"
+        }
+        normalized_question = _normalize_text(question)
+        expects_json = _question_requests_json(normalized_question)
 
         input_selector = _find_input_selector(page)
         if not input_selector:
@@ -130,39 +270,73 @@ def ask_youmind(question: str, board_url: str, headless: bool = True) -> Optiona
 
         print("  ⏳ Waiting for answer...")
 
-        deadline = time.time() + 120
+        submit_started_at = time.time()
+        deadline = submit_started_at + max(30, int(timeout_seconds))
         stable_count = 0
+        last_candidate_id: Optional[str] = None
         last_text = None
+        target_user_id: Optional[str] = None
+        target_user_is_question_match = False
 
         while time.time() < deadline:
-            responses = _collect_responses(page)
+            conversation = _collect_conversation_sequence(page)
             candidate = None
+            candidate_id = None
+            elapsed = time.time() - submit_started_at
 
-            if responses:
-                current_counts = Counter(responses)
+            if conversation:
+                users = [msg for msg in conversation if msg.get("type") == "user"]
+                assistants = [msg for msg in conversation if msg.get("type") == "assistant"]
 
-                # Find text whose occurrence increased after submit.
-                for text in reversed(responses):
-                    if current_counts[text] > previous_counts.get(text, 0):
-                        candidate = text
+                # Primary path: newest user turn that matches this exact question.
+                matching_user_ids = [
+                    msg["id"]
+                    for msg in users
+                    if normalized_question and _is_same_question(msg["text"], normalized_question)
+                ]
+                if matching_user_ids:
+                    newest_match = max(matching_user_ids)
+                    if newest_match > baseline_max_user_id:
+                        target_user_id = newest_match
+                        target_user_is_question_match = True
+
+                # Fallback: if exact match can't be found, use latest user turn after submit.
+                if target_user_id is None and elapsed >= 20:
+                    post_submit_user_ids = [
+                        msg["id"] for msg in users if msg["id"] > baseline_max_user_id
+                    ]
+                    if post_submit_user_ids:
+                        target_user_id = max(post_submit_user_ids)
+
+                if target_user_id is not None:
+                    post_target_assistants = sorted(
+                        [msg for msg in assistants if msg["id"] > target_user_id],
+                        key=lambda x: x["id"],
+                    )
+                    for assistant_msg in post_target_assistants:
+                        assistant_text = assistant_msg["text"]
+                        if not assistant_text:
+                            continue
+                        if _looks_like_metadata_json(assistant_text) and not expects_json:
+                            continue
+                        if (
+                            not target_user_is_question_match
+                            and assistant_text in previous_assistant_text_set
+                            and elapsed < 20
+                        ):
+                            continue
+                        candidate = assistant_text
+                        candidate_id = assistant_msg["id"]
                         break
 
-                # Fallback: updated-in-place latest response.
-                if (
-                    candidate is None
-                    and previous_last_response
-                    and responses[-1] != previous_last_response
-                    and responses != previous_responses
-                ):
-                    candidate = responses[-1]
-
             if candidate:
-                if candidate == last_text:
+                if candidate_id == last_candidate_id and candidate == last_text:
                     stable_count += 1
-                    if stable_count >= 3:
+                    if stable_count >= 2 and elapsed >= 3:
                         print("  ✅ Got answer")
                         return candidate + FOLLOW_UP_REMINDER
                 else:
+                    last_candidate_id = candidate_id
                     last_text = candidate
                     stable_count = 1
 
@@ -173,7 +347,7 @@ def ask_youmind(question: str, board_url: str, headless: bool = True) -> Optiona
 
             time.sleep(0.8)
 
-        print("  ❌ Timeout waiting for answer")
+        print(f"  ❌ Timeout waiting for answer ({max(30, int(timeout_seconds))}s)")
         return None
 
     except Exception as e:
@@ -232,6 +406,12 @@ def main():
     parser.add_argument("--board-url", help="Youmind board URL")
     parser.add_argument("--board-id", help="Board ID from local library")
     parser.add_argument("--show-browser", action="store_true", help="Show browser for debugging")
+    parser.add_argument(
+        "--timeout-seconds",
+        type=int,
+        default=QUERY_TIMEOUT_SECONDS,
+        help=f"Max time to wait for answer (default: {QUERY_TIMEOUT_SECONDS})",
+    )
     args = parser.parse_args()
 
     board_url = _resolve_board_url(args.board_url, args.board_id)
@@ -245,6 +425,7 @@ def main():
         question=args.question,
         board_url=board_url,
         headless=not args.show_browser,
+        timeout_seconds=args.timeout_seconds,
     )
 
     if not answer:

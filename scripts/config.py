@@ -30,6 +30,11 @@ QUERY_INPUT_SELECTORS = [
     "div[contenteditable='true']",
 ]
 
+USER_MESSAGE_SELECTORS = [
+    "div.ym-ask-user-content[data-user-message='true'][data-message-id]",
+    "div.ym-ask-user-content[data-message-id]",
+]
+
 SEND_BUTTON_SELECTORS = [
     "button[aria-label*='Send']",
     "button[data-testid*='send']",
@@ -37,17 +42,19 @@ SEND_BUTTON_SELECTORS = [
 ]
 
 RESPONSE_SELECTORS = [
+    "div.ym-askai-container[data-pick-selection-message-id]",
+    "div.ym-askai-container",
     "div.message-blocks",
     "div[class*='message-blocks']",
     "[class*='message-blocks']",
     "[data-message-author='assistant']",
     "[data-role='assistant']",
     "[data-testid*='assistant']",
-    "div[class*='message']",
-    "[class*='message']",
     ".assistant-message",
     ".message.ai",
     ".message-content",
+    "div[class*='message']",
+    "[class*='message']",
 ]
 
 THINKING_SELECTORS = [
@@ -68,5 +75,5 @@ USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
 
 # Timeouts
 LOGIN_TIMEOUT_MINUTES = 10
-QUERY_TIMEOUT_SECONDS = 120
+QUERY_TIMEOUT_SECONDS = 420
 PAGE_LOAD_TIMEOUT = 30000
