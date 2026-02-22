@@ -1,14 +1,16 @@
 <div align="center">
 
-# Youmind Claude/Codex Skill
+# Youmind Claude Code Skill
 
-**Let Claude Code / Codex chat directly with Youmind boards from your terminal**
+**Let [Claude Code](https://github.com/anthropics/claude-code) and Codex chat directly with your Youmind boards**
 
 [![Python](https://img.shields.io/badge/Python-3.8+-blue.svg)](https://www.python.org/)
-[![Skill](https://img.shields.io/badge/CLI-Skill-green.svg)](https://github.com/anthropics/claude-code)
-[![GitHub](https://img.shields.io/badge/Repo-youmind--skill-black.svg)](https://github.com/p697/youmind-skill)
+[![Claude Code Skill](https://img.shields.io/badge/Claude%20Code-Skill-purple.svg)](https://www.anthropic.com/news/skills)
+[![GitHub](https://img.shields.io/github/stars/p697/youmind-skill?style=social)](https://github.com/p697/youmind-skill)
 
-[Installation](#installation) • [Quick Start](#quick-start) • [How It Works](#how-it-works) • [Commands](#common-commands) • [Limitations](#limitations)
+> Use this skill to query Youmind board chat directly from Claude Code/Codex. Browser automation, persistent auth, board library management, and NotebookLM-style Smart Add auto naming.
+
+[Installation](#installation) • [Quick Start](#quick-start) • [Why Youmind](#why-youmind-not-manual-copy-paste) • [How It Works](#how-it-works)
 
 </div>
 
@@ -16,228 +18,226 @@
 
 ## Important: Local CLI Only
 
-This skill is designed for local CLI agents (Claude Code / Codex). It relies on browser automation and persistent local auth state.
+This skill is designed for local CLI agents (Claude Code / Codex), not sandboxed web chat environments.
+
+It requires:
+- Local browser automation
+- Local auth persistence
+- Local filesystem state under `data/`
 
 ---
 
 ## The Problem
 
-When your project knowledge is inside Youmind boards, normal agent workflows are inefficient:
+When your product docs, research notes, and references live in Youmind boards, coding workflows get fragmented:
 
-- You keep switching between terminal and browser.
-- Context gets lost between manual copy-paste steps.
-- Metadata about which board to query is often inconsistent.
-- Repetitive setup/auth friction slows daily usage.
+- You jump between terminal and browser repeatedly
+- You lose context while copy-pasting questions and answers
+- Board metadata is inconsistent, so retrieval quality drops
+- Login/setup friction interrupts research flow
 
 ## The Solution
 
-This repository provides a local skill that automates the full loop:
+This skill lets your coding agent ask Youmind directly:
 
 ```text
-Your task -> agent runs skill -> skill asks Youmind board chat -> answer returns to terminal
+Your task -> Agent asks Youmind board chat -> Youmind answers -> Agent continues implementation
 ```
 
-The skill includes:
-
-- `auth_manager.py`: persistent Youmind login setup/validation
-- `board_manager.py`: local board library and Smart Add
-- `ask_question.py`: stateless board chat querying
-- `run.py`: environment bootstrap + unified script entry
+No manual copy-paste loop.
 
 ---
 
-## Why This Skill
+## Why Youmind, Not Manual Copy-Paste?
 
-Compared with ad-hoc browser/manual workflows:
+| Approach | Context Switching | Setup | Reliability | Velocity |
+|----------|-------------------|-------|-------------|----------|
+| Browser copy-paste | High | Instant | Human-error prone | Slow |
+| Ad-hoc local file search | Medium | Low | Misses board-level context | Medium |
+| Youmind Skill | Low | Minutes | Consistent board routing + saved auth | High |
 
-- Lower friction: one command path for auth, add, and query.
-- Better consistency: board metadata is normalized in local library.
-- Reusable workflow: Smart Add can auto-discover board metadata.
-- Safer operations: all data and browser state stay local in `data/`.
+### What this skill adds on top of plain Youmind chat
+
+1. Agent-native workflow in terminal
+2. Persistent authentication across runs
+3. Reusable board library with active-board selection
+4. Smart Add auto metadata discovery and naming
+5. Follow-up reminder flow to reduce incomplete answers
 
 ---
 
 ## Installation
 
 ```bash
-# 1) Clone
+# 1. Create skills directory (if needed)
+mkdir -p ~/.claude/skills
+
+# 2. Clone repository
 cd ~/.claude/skills
 git clone https://github.com/p697/youmind-skill.git
 
-# 2) Enter the skill directory
+# 3. Enter skill directory
 cd youmind-skill
 ```
 
-First run auto-creates `.venv`, installs dependencies, and installs Chrome for Patchright.
+On first real use, the skill auto-creates `.venv`, installs dependencies, and installs Chrome runtime for Patchright.
 
 ---
 
 ## Quick Start
 
-### 1) Authenticate once
+### 1. Check available skills
 
-```bash
-python scripts/run.py auth_manager.py setup
+Say in Claude Code/Codex:
+
+```text
+What skills do I have?
 ```
 
-A browser opens. Complete Youmind login manually.
+### 2. Authenticate once
 
-### 2) Add your board
-
-Manual add:
-
-```bash
-python scripts/run.py board_manager.py add \
-  --url "https://youmind.com/boards/..." \
-  --name "My Board" \
-  --description "What this board contains" \
-  --topics "product,docs,research"
+```text
+Set up Youmind authentication
 ```
 
-One-command Smart Add:
+A browser opens, you complete login, and auth state is stored locally.
 
-```bash
-python scripts/run.py board_manager.py smart-add \
-  --url "https://youmind.com/boards/..."
+### 3. Add your board
+
+Option A: Smart Add (recommended)
+
+```text
+Smart add this board: https://youmind.com/boards/...
 ```
 
-### 3) Ask questions
+Option B: Manual add
 
-```bash
-python scripts/run.py ask_question.py --question "Summarize key decisions"
+```text
+Add this Youmind board to my library: https://youmind.com/boards/...
+```
+
+### 4. Start querying
+
+```text
+Ask my Youmind board: summarize the key technical decisions
 ```
 
 ---
 
-## Smart Add Modes
+## Smart Add (NotebookLM-Style Auto Naming)
 
-`smart-add` supports two discovery modes:
+Smart Add is the Youmind mapping of NotebookLM skill's one-click auto onboarding.
 
-1. Default two-pass (recommended):
-- Pass 1: summary discovery
-- Pass 2: structured JSON discovery
-- If Pass 2 fails, it falls back to Pass 1 parsing
+What it does:
+1. Queries the board automatically
+2. Extracts structured metadata (`name`, `description`, `topics`)
+3. Saves the board to local library
+4. Activates it by default
 
-2. Single-pass structured mode:
+Discovery modes:
+- Two-pass (default): summary then structured JSON extraction
+- Single-pass: one structured extraction query
 
-```bash
-python scripts/run.py board_manager.py smart-add \
-  --url "https://youmind.com/boards/..." \
-  --single-pass
-```
-
-Useful options:
-
-```bash
---show-browser
---prompt "custom summary prompt"
---json-prompt "custom structured prompt"
---allow-duplicate-url
---no-activate
-```
+If extraction quality is poor, the workflow falls back to summary-based metadata generation.
 
 ---
 
 ## How It Works
 
+This is a local skill folder with instructions + Python automation scripts.
+
 ```text
+SKILL.md
 scripts/
-├── run.py                # Entry point, ensures .venv
-├── setup_environment.py  # Installs dependencies and browser runtime
-├── auth_manager.py       # Login setup/status/validate/reauth/clear
-├── board_manager.py      # Board library + smart-add workflow
-├── ask_question.py       # Ask board chat (stateless per query)
-├── browser_utils.py      # Browser factory + interaction helpers
-├── browser_session.py    # Optional session abstraction
-└── cleanup_manager.py    # Local data cleanup
+  run.py
+  auth_manager.py
+  board_manager.py
+  ask_question.py
+  browser_utils.py
+  browser_session.py
+  cleanup_manager.py
+  setup_environment.py
+references/
+  api_reference.md
+  usage_patterns.md
+  troubleshooting.md
+data/ (generated locally)
 ```
 
-Data layout:
-
-```text
-data/
-├── library.json
-├── auth_info.json
-└── browser_state/
-    └── state.json
-```
+Runtime model:
+1. Agent detects Youmind intent
+2. Agent runs the matching script via `scripts/run.py`
+3. Browser automation opens Youmind and submits query
+4. Answer is returned to the agent
+5. Agent decides whether follow-up questions are needed
 
 ---
 
 ## Core Features
 
-- Persistent local authentication for Youmind.
-- Board library management with active board selection.
-- Query by `--board-url`, `--board-id`, or active board fallback.
-- Smart Add metadata discovery and normalization.
-- Follow-up reminder appended to every answer.
-- Cleanup workflow for browser/auth/library state.
+### Source-constrained board querying
+Queries are grounded in the selected Youmind board context.
+
+### Board library management
+Add/list/search/activate/remove boards with local metadata persistence.
+
+### Persistent authentication
+One-time login with reusable local browser state.
+
+### Smart Add auto onboarding
+Board metadata discovery with automatic naming and topic generation.
+
+### Local isolation
+Dependencies and state stay inside the skill folder.
 
 ---
 
-## Common Commands
+## Common Prompts
 
-### Authentication
-
-```bash
-python scripts/run.py auth_manager.py status
-python scripts/run.py auth_manager.py validate
-python scripts/run.py auth_manager.py setup
-python scripts/run.py auth_manager.py reauth
-python scripts/run.py auth_manager.py clear
-```
-
-### Board Library
-
-```bash
-python scripts/run.py board_manager.py list
-python scripts/run.py board_manager.py add --url URL --name NAME --description DESC --topics TOPICS
-python scripts/run.py board_manager.py smart-add --url URL
-python scripts/run.py board_manager.py search --query QUERY
-python scripts/run.py board_manager.py activate --id BOARD_ID
-python scripts/run.py board_manager.py remove --id BOARD_ID
-python scripts/run.py board_manager.py stats
-```
-
-### Ask Youmind
-
-```bash
-python scripts/run.py ask_question.py --question "Your question"
-python scripts/run.py ask_question.py --question "..." --board-id BOARD_ID
-python scripts/run.py ask_question.py --question "..." --board-url "https://youmind.com/boards/..."
-python scripts/run.py ask_question.py --question "..." --show-browser
-```
-
-### Cleanup
-
-```bash
-python scripts/run.py cleanup_manager.py
-python scripts/run.py cleanup_manager.py --confirm
-python scripts/run.py cleanup_manager.py --confirm --preserve-library
-```
+| What you say | What happens |
+|--------------|--------------|
+| "Set up Youmind authentication" | Opens browser login and saves auth state |
+| "Smart add this board: [link]" | Auto-discovers metadata and saves board |
+| "Show my Youmind boards" | Lists saved board library |
+| "Use this board: [name/id]" | Sets active board |
+| "Ask my Youmind board about [topic]" | Queries board chat and returns answer |
+| "Clean Youmind local state" | Clears generated local runtime data |
 
 ---
 
 ## Limitations
 
-- This is browser automation, not an official Youmind API integration.
-- Frontend selector changes may require updates in `scripts/config.py`.
-- Query sessions are stateless (each ask opens a fresh browser session).
-- Smart Add output quality depends on board chat response behavior.
+- Browser automation (not an official Youmind API)
+- UI selector drift may occur when Youmind updates frontend
+- Stateless ask model (each run is an independent query)
+- Smart Add quality depends on board chat response quality
 
 ---
 
 ## Troubleshooting
 
-- If auth fails: run `python scripts/run.py auth_manager.py reauth`
-- If query fails: rerun with `--show-browser` and inspect UI state
-- If board lookup fails: run `python scripts/run.py board_manager.py list`
-- If environment issues occur: remove `.venv` and rerun via `scripts/run.py`
+Try these prompts first:
 
-More details: `references/troubleshooting.md`
+```text
+Re-authenticate Youmind
+Show browser and retry the same question
+List my board library
+```
+
+Detailed references:
+- `references/troubleshooting.md`
+- `references/api_reference.md`
+- `references/usage_patterns.md`
+
+---
+
+## Security Notes
+
+- `data/` contains auth/browser state and must not be committed
+- Use a dedicated automation account if your organization requires strict separation
 
 ---
 
 ## License
 
-MIT (see `LICENSE`).
+MIT (`LICENSE`)
