@@ -1,6 +1,6 @@
 ---
 name: youmind
-description: Use this skill to query Youmind boards directly from Claude/Codex via browser automation, with persistent authentication and a local board library. Trigger when users mention Youmind, share a board URL (https://youmind.com/boards/...), ask to chat with board materials, or request board management.
+description: Use this skill to query Youmind boards directly from Claude/Codex via browser automation, with persistent authentication and a local board library. Supports board Q&A and adding links/materials to a board via chat actions. Trigger when users mention Youmind, share a board URL (https://youmind.com/boards/...), ask to chat with board materials, ask to save/add a link into a board, or request board management.
 ---
 
 # Youmind Research Assistant Skill
@@ -118,6 +118,34 @@ python scripts/run.py ask_question.py --question "..." --board-url "https://youm
 python scripts/run.py ask_question.py --question "..." --show-browser
 ```
 
+### 5. Add Material to a Board (Supported)
+
+This skill can add URLs/materials to a Youmind board by issuing an explicit save command through board chat.
+
+Use this when user says things like:
+- "把这个链接加到这个board"
+- "保存这个网页到YouMind"
+- "add this URL to my board"
+
+Recommended execution pattern:
+
+```bash
+# Step 1: send a strict add-only command
+python scripts/run.py ask_question.py \
+  --board-url "https://youmind.com/boards/..." \
+  --question "只执行一个动作：把这个链接添加到当前board资料库 https://example.com 。不要总结，不要列清单。完成后只回复：ADD_OK。"
+
+# Step 2: verify it is actually present (best-effort confirmation)
+python scripts/run.py ask_question.py \
+  --board-url "https://youmind.com/boards/..." \
+  --question "请确认刚才添加的链接是否已保存成功：https://example.com。如果成功，请回复 CONFIRMED。"
+```
+
+Important:
+- This is a chat-driven write action (not an official add API).
+- Always perform a follow-up verification question.
+- If verification fails, retry once with `--show-browser`.
+
 ## Follow-Up Rule
 
 Every answer appends a reminder asking whether information is complete.
@@ -155,6 +183,8 @@ python scripts/run.py board_manager.py stats
 
 ```bash
 python scripts/run.py ask_question.py --question "..." [--board-id ID] [--board-url URL] [--show-browser]
+# Optional long-wait override for slow boards
+python scripts/run.py ask_question.py --question "..." --timeout-seconds 420
 ```
 
 ### `cleanup_manager.py`
@@ -197,6 +227,7 @@ python -m patchright install chrome
 - Stateless query model: no persistent chat thread context.
 - UI selectors can change as Youmind updates their frontend.
 - Requires valid Youmind login for private board access.
+- "Add material" is best-effort through chat instructions, not a dedicated Youmind write API.
 
 ## Resources
 
