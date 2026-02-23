@@ -10,6 +10,7 @@ import sys
 import time
 from pathlib import Path
 from typing import Dict, List, Optional
+from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
 from patchright.sync_api import sync_playwright
 
@@ -38,6 +39,51 @@ FOLLOW_UP_REMINDER = (
 
 def _normalize_text(text: str) -> str:
     return re.sub(r"\s+", " ", text).strip()
+
+
+def _question_needs_context_id(question: str) -> bool:
+    """Heuristic: keep material/craft id only when user asks current material context."""
+    q = _normalize_text(question).lower()
+    context_keywords = [
+        "当前文章",
+        "当前素材",
+        "这篇文章",
+        "这条素材",
+        "当前内容",
+        "当前卡片",
+        "material",
+        "craft",
+        "current article",
+        "current material",
+        "this article",
+        "this material",
+    ]
+    return any(token in q for token in context_keywords)
+
+
+def _strip_context_ids(board_url: str) -> str:
+    """Remove material-id/craft-id from a board URL while keeping other query params."""
+    parsed = urlparse(board_url)
+    query_items = parse_qsl(parsed.query, keep_blank_values=True)
+    filtered = [
+        (k, v)
+        for (k, v) in query_items
+        if k.lower() not in {"material-id", "craft-id"}
+    ]
+    new_query = urlencode(filtered, doseq=True)
+    return urlunparse((parsed.scheme, parsed.netloc, parsed.path, parsed.params, new_query, ""))
+
+
+def _resolve_effective_board_url(board_url: str, question: str) -> str:
+    """Default to board-level URL unless question explicitly needs material/craft context."""
+    parsed = urlparse(board_url)
+    query_keys = {k.lower() for (k, _) in parse_qsl(parsed.query, keep_blank_values=True)}
+    has_context_id = any(key in {"material-id", "craft-id"} for key in query_keys)
+    if not has_context_id:
+        return board_url
+    if _question_needs_context_id(question):
+        return board_url
+    return _strip_context_ids(board_url)
 
 
 def _is_same_question(user_text: str, question: str) -> bool:
@@ -215,8 +261,11 @@ def ask_youmind(
         print("⚠️ Not authenticated. Run: python scripts/run.py auth_manager.py setup")
         return None
 
+    effective_board_url = _resolve_effective_board_url(board_url, question)
     print(f"💬 Asking: {question}")
-    print(f"🧠 Board: {board_url}")
+    print(f"🧠 Board: {effective_board_url}")
+    if effective_board_url != board_url:
+        print("  ℹ️ Ignoring material/craft context id for board-level query")
 
     playwright = None
     context = None
@@ -227,7 +276,7 @@ def ask_youmind(
 
         page = context.new_page()
         print("  🌐 Opening board...")
-        page.goto(board_url, wait_until="domcontentloaded")
+        page.goto(effective_board_url, wait_until="domcontentloaded")
 
         # If redirected to sign-in, auth is invalid.
         if "youmind.com" not in page.url or "sign-in" in page.url:

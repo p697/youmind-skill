@@ -118,6 +118,14 @@ python scripts/run.py ask_question.py --question "..." --board-url "https://youm
 python scripts/run.py ask_question.py --question "..." --show-browser
 ```
 
+Board URL context rule:
+- If user provides a board URL with `material-id` / `craft-id`, do NOT always keep it.
+- Default behavior: ignore these IDs and run a board-level query.
+- Keep these IDs only when user intent explicitly requires current material context, e.g.:
+  - "读一下当前文章"
+  - "基于当前素材继续分析"
+  - "summarize this current material"
+
 ### 5. Add Material to a Board (Supported)
 
 This skill can add URLs/materials to a Youmind board by issuing an explicit save command through board chat.

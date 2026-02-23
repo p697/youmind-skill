@@ -10,6 +10,7 @@ import re
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
 
 def slugify(value: str) -> str:
@@ -18,6 +19,25 @@ def slugify(value: str) -> str:
     slug = re.sub(r"[^a-z0-9]+", "-", slug)
     slug = re.sub(r"-+", "-", slug).strip("-")
     return slug or "board"
+
+
+def normalize_board_url(url: str) -> str:
+    """
+    Canonical board URL for library storage:
+    - keep scheme/netloc/path
+    - drop material-id/craft-id query context
+    - keep any other query params
+    - drop fragment
+    """
+    parsed = urlparse(url)
+    query_items = parse_qsl(parsed.query, keep_blank_values=True)
+    filtered = [
+        (k, v)
+        for (k, v) in query_items
+        if k.lower() not in {"material-id", "craft-id"}
+    ]
+    new_query = urlencode(filtered, doseq=True)
+    return urlunparse((parsed.scheme, parsed.netloc, parsed.path, parsed.params, new_query, ""))
 
 
 class BoardLibrary:
@@ -60,8 +80,9 @@ class BoardLibrary:
 
     def find_board_by_url(self, url: str) -> Optional[Dict[str, Any]]:
         """Find an existing board by exact URL."""
+        target_url = normalize_board_url(url)
         for board in self.boards.values():
-            if board.get("url") == url:
+            if normalize_board_url(board.get("url", "")) == target_url:
                 return board
         return None
 
@@ -84,11 +105,12 @@ class BoardLibrary:
         use_cases: Optional[List[str]] = None,
         tags: Optional[List[str]] = None,
     ) -> Dict[str, Any]:
+        normalized_url = normalize_board_url(url)
         board_id = self._ensure_unique_id(slugify(name))
 
         board = {
             "id": board_id,
-            "url": url,
+            "url": normalized_url,
             "name": name,
             "description": description,
             "topics": topics,
