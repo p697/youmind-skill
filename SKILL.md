@@ -173,6 +173,36 @@ Important:
 - Only run a second verification ask if the reply is ambiguous or indicates failure.
 - If needed, retry once with `--show-browser`.
 
+### 6. Export/Import Board Library
+
+Backup or migrate your board library:
+
+```bash
+# Export library to a JSON file
+python scripts/run.py board_manager.py export
+
+# Export with custom filename
+python scripts/run.py board_manager.py export -o my-boards.json
+
+# Include authentication metadata (for cross-device migration)
+python scripts/run.py board_manager.py export --include-auth
+
+# Import library (dry run first to preview)
+python scripts/run.py board_manager.py import -i my-boards.json --dry-run
+
+# Import with merge (update existing, add new)
+python scripts/run.py board_manager.py import -i my-boards.json --merge
+
+# Import only new boards (skip existing)
+python scripts/run.py board_manager.py import -i my-boards.json
+```
+
+Export includes:
+- All board metadata (name, description, topics, use counts)
+- Active board selection
+- Library statistics
+- Optional: authentication metadata (without sensitive browser state)
+
 ## Follow-Up Rule
 
 Every answer appends a reminder asking whether information is complete.

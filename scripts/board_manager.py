@@ -520,6 +520,134 @@ class BoardLibrary:
             "library_path": str(self.library_file),
         }
 
+    def export_library(self, output_path: Optional[str] = None, include_auth: bool = False) -> str:
+        """Export board library to a JSON file."""
+        import json
+        from datetime import datetime
+
+        # Default filename with timestamp
+        if output_path is None:
+            timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+            output_path = f"youmind-library-{timestamp}.json"
+
+        # Prepare export data
+        export_data = {
+            "export_version": "1.0",
+            "export_date": datetime.now().isoformat(),
+            "exported_from": str(self.library_file),
+            "boards": self.boards,
+            "active_board_id": self.active_board_id,
+            "stats": self.get_stats(),
+        }
+
+        # Optionally include auth metadata (without sensitive state)
+        if include_auth:
+            auth_file = self.data_dir / "auth_info.json"
+            if auth_file.exists():
+                try:
+                    with open(auth_file, "r") as f:
+                        auth_data = json.load(f)
+                    # Only include metadata, not cookies/state
+                    export_data["auth_metadata"] = {
+                        "authenticated": auth_data.get("authenticated", False),
+                        "user_id": auth_data.get("user_id"),
+                        "email": auth_data.get("email"),
+                        "auth_date": auth_data.get("date"),
+                    }
+                except Exception:
+                    pass
+
+        # Write to file
+        output_file = Path(output_path)
+        with open(output_file, "w") as f:
+            json.dump(export_data, f, indent=2, ensure_ascii=False)
+
+        print(f"✅ Exported {len(self.boards)} boards to: {output_file.absolute()}")
+        return str(output_file.absolute())
+
+    def import_library(
+        self,
+        input_path: str,
+        merge: bool = False,
+        dry_run: bool = False,
+    ) -> Dict[str, Any]:
+        """Import board library from a JSON file."""
+        import json
+        from datetime import datetime
+
+        input_file = Path(input_path)
+        if not input_file.exists():
+            raise FileNotFoundError(f"Import file not found: {input_path}")
+
+        # Load import data
+        with open(input_file, "r") as f:
+            import_data = json.load(f)
+
+        # Validate format
+        if "boards" not in import_data:
+            raise ValueError("Invalid import file: missing 'boards' field")
+
+        imported_boards = import_data.get("boards", {})
+        imported_active_id = import_data.get("active_board_id")
+
+        # Calculate changes
+        stats = {
+            "existing_boards": len(self.boards),
+            "imported_boards": len(imported_boards),
+            "new_boards": 0,
+            "updated_boards": 0,
+            "conflicts": [],
+        }
+
+        # Check for conflicts/duplicates
+        for board_id, board_data in imported_boards.items():
+            if board_id in self.boards:
+                stats["conflicts"].append(board_id)
+                if merge:
+                    stats["updated_boards"] += 1
+            else:
+                stats["new_boards"] += 1
+
+        if dry_run:
+            print("\n📋 Dry Run Preview:")
+            print(f"  - Existing boards: {stats['existing_boards']}")
+            print(f"  - Boards to import: {stats['imported_boards']}")
+            print(f"  - New boards: {stats['new_boards']}")
+            print(f"  - Conflicts (same ID): {len(stats['conflicts'])}")
+            if merge and stats["conflicts"]:
+                print(f"  - Will update conflicts: Yes")
+            elif stats["conflicts"]:
+                print(f"  - Will skip conflicts: Yes")
+            return stats
+
+        # Apply import
+        if merge:
+            # Merge: add new boards, update existing
+            for board_id, board_data in imported_boards.items():
+                self.boards[board_id] = board_data
+            print(f"✅ Merged {len(imported_boards)} boards (added {stats['new_boards']}, updated {stats['updated_boards']})")
+        else:
+            # Replace: clear existing and add imported (except conflicts)
+            original_count = len(self.boards)
+            added = 0
+            skipped = 0
+            for board_id, board_data in imported_boards.items():
+                if board_id in self.boards:
+                    skipped += 1
+                    continue
+                self.boards[board_id] = board_data
+                added += 1
+            print(f"✅ Imported {added} new boards (skipped {skipped} existing)")
+
+        # Set active board if not already set
+        if imported_active_id and not self.active_board_id:
+            if imported_active_id in self.boards:
+                self.active_board_id = imported_active_id
+                print(f"✅ Set active board: {imported_active_id}")
+
+        self._save_library()
+        return stats
+
 
 def main():
     parser = argparse.ArgumentParser(description="Manage Youmind board library")
@@ -573,6 +701,38 @@ def main():
     remove_parser.add_argument("--id", required=True, help="Board ID")
 
     subparsers.add_parser("stats", help="Show statistics")
+
+    # Export command
+    export_parser = subparsers.add_parser("export", help="Export board library to a file")
+    export_parser.add_argument(
+        "--output",
+        "-o",
+        help="Output file path (default: youmind-library-YYYYMMDD-HHMMSS.json)",
+    )
+    export_parser.add_argument(
+        "--include-auth",
+        action="store_true",
+        help="Include authentication metadata (default: False for security)",
+    )
+
+    # Import command
+    import_parser = subparsers.add_parser("import", help="Import board library from a file")
+    import_parser.add_argument(
+        "--input",
+        "-i",
+        required=True,
+        help="Input file path to import",
+    )
+    import_parser.add_argument(
+        "--merge",
+        action="store_true",
+        help="Merge with existing library instead of replacing",
+    )
+    import_parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Preview changes without applying",
+    )
 
     args = parser.parse_args()
     library = BoardLibrary()
@@ -648,6 +808,37 @@ def main():
         if stats["most_used_board"]:
             print(f"  Most used: {stats['most_used_board']['name']} ({stats['most_used_board']['use_count']} uses)")
         print(f"  Library path: {stats['library_path']}")
+
+    elif args.command == "export":
+        try:
+            output_file = library.export_library(
+                output_path=args.output,
+                include_auth=args.include_auth,
+            )
+            print(f"\n💡 Import with:")
+            print(f"  python scripts/run.py board_manager.py import -i '{output_file}'")
+        except Exception as e:
+            print(f"❌ Export failed: {e}")
+            return 1
+
+    elif args.command == "import":
+        try:
+            stats = library.import_library(
+                input_path=args.input,
+                merge=args.merge,
+                dry_run=args.dry_run,
+            )
+            if args.dry_run:
+                print("\n⚠️ Dry run - no changes made. Run without --dry-run to apply.")
+        except FileNotFoundError as e:
+            print(f"❌ Import failed: {e}")
+            return 1
+        except ValueError as e:
+            print(f"❌ Import failed: {e}")
+            return 1
+        except Exception as e:
+            print(f"❌ Import failed: {e}")
+            return 1
 
     else:
         parser.print_help()

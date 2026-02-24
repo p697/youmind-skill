@@ -2,6 +2,19 @@
 
 All notable changes to this project are documented here.
 
+## [2.1.0] - 2026-02-24
+
+### Added
+- **Board library export/import** functionality in `board_manager.py`
+  - `export` command: Backup library to JSON with timestamp
+  - `import` command: Restore library from JSON with merge/replace options
+  - `--dry-run` flag for safe import preview
+  - `--include-auth` option for cross-device migration
+- Comprehensive error handling for import operations (FileNotFound, ValueError)
+
+### Changed
+- Updated `SKILL.md` with export/import workflow documentation
+
 ## [2.0.0] - 2026-02-22
 
 ### Added
