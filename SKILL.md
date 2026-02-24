@@ -39,7 +39,7 @@ python scripts/run.py ask_question.py --question "..."
 For this skill, do NOT invent or implement any "switch to Agent mode" step.
 - There is no dedicated UI mode toggle required for add/query actions.
 - Do not patch `ask_question.py` to add `_try_switch_agent_mode` or similar behavior.
-- For add-material tasks, use normal chat command execution and parse success markers (`ADD_OK`, `资料已保存`, `资料已添加`).
+- For add-material tasks, use normal chat command execution and parse success markers (`ADD_OK`, `资料已保存` (material saved), `资料已添加` (material added)).
 - If add fails, retry or use `--show-browser`; do not modify skill code during task execution.
 
 ## Workflow
@@ -67,7 +67,7 @@ If auto-discovery quality is poor for a specific board, use two-step fallback:
 ```bash
 # Step 1: Discover board content
 python scripts/run.py ask_question.py \
-  --question "请简要概括这个board的内容、主题与典型使用场景" \
+  --question "Please briefly summarize the content, topics, and typical use cases of this board" \
   --board-url "https://youmind.com/boards/..."
 
 # Step 2: Add using discovered metadata
@@ -141,17 +141,17 @@ Board URL context rule:
 - If user provides a board URL with `material-id` / `craft-id`, do NOT always keep it.
 - Default behavior: ignore these IDs and run a board-level query.
 - Keep these IDs only when user intent explicitly requires current material context, e.g.:
-  - "读一下当前文章"
-  - "基于当前素材继续分析"
-  - "summarize this current material"
+  - "Read the current article"
+  - "Continue analysis based on the current material"
+  - "Summarize this current material"
 
 ### 5. Add Material to a Board (Supported)
 
 This skill can add URLs/materials to a Youmind board by issuing an explicit save command through board chat.
 
 Use this when user says things like:
-- "把这个链接加到这个board"
-- "保存这个网页到YouMind"
+- "Add this link to this board"
+- "Save this webpage to YouMind"
 - "add this URL to my board"
 
 Recommended execution pattern (single-pass, fast path):
@@ -160,7 +160,7 @@ Recommended execution pattern (single-pass, fast path):
 # Send a strict add-only command
 python scripts/run.py ask_question.py \
   --board-url "https://youmind.com/boards/..." \
-  --question "只执行一个动作：把这个链接添加到当前board资料库 https://example.com 。不要总结，不要列清单。完成后只回复：ADD_OK。"
+  --question "Perform one action only: add this link to the current board library https://example.com . Do not summarize or list anything. Reply only with: ADD_OK when done."
 ```
 
 Important:
@@ -168,8 +168,8 @@ Important:
 - Prefer single-pass result parsing for speed/token savings.
 - Treat it as success if response contains clear success markers like:
   - `ADD_OK`
-  - `资料已保存`
-  - `资料已添加`
+  - `资料已保存` (material saved)
+  - `资料已添加` (material added)
 - Only run a second verification ask if the reply is ambiguous or indicates failure.
 - If needed, retry once with `--show-browser`.
 
