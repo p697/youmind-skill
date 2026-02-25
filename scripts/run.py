@@ -41,9 +41,11 @@ def main():
     if len(sys.argv) < 2:
         print("Usage: python scripts/run.py <script_name> [args...]")
         print("\nAvailable scripts:")
-        print("  ask_question.py   - Ask Youmind board chat")
-        print("  board_manager.py  - Manage board library")
-        print("  auth_manager.py   - Setup/validate authentication")
+        print("  board_manager.py   - Board APIs (list/find/get/create)")
+        print("  material_manager.py - Material APIs (add-link/upload-file/get-snips)")
+        print("  chat_manager.py    - Chat APIs (create/send/history/detail)")
+        print("  ask_question.py    - Compatibility wrapper over chat APIs")
+        print("  auth_manager.py    - Browser login bootstrap/validation")
         print("  cleanup_manager.py - Clean local skill data")
         raise SystemExit(1)
 
