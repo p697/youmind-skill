@@ -1,13 +1,8 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 """
 Universal runner for Youmind skill scripts.
 Ensures scripts always run inside the local virtual environment.
-
-Compatibility note:
-- If launched by Python 2 (e.g. `python scripts/run.py ...`), it will auto re-exec with Python 3.
 """
-
-from __future__ import print_function
 
 import os
 import subprocess
@@ -15,57 +10,6 @@ import sys
 
 
 MIN_PYTHON = (3, 10)
-
-
-def _find_python3():
-    """Find a usable Python executable that satisfies MIN_PYTHON."""
-    candidates = []
-    env_py = os.environ.get("PYTHON3")
-    if env_py:
-        candidates.append(env_py)
-    candidates.extend(["python3", "python"])
-
-    for exe in candidates:
-        try:
-            out = subprocess.check_output(
-                [exe, "-c", "import sys; print('%d.%d' % (sys.version_info[0], sys.version_info[1]))"],
-                stderr=subprocess.STDOUT,
-            )
-            version_text = out.decode("utf-8", "ignore").strip()
-            parts = version_text.split(".")
-            if len(parts) < 2:
-                continue
-            major = int(parts[0])
-            minor = int(parts[1])
-            if (major, minor) >= MIN_PYTHON:
-                return exe
-        except Exception:
-            continue
-    return None
-
-
-def _ensure_python3():
-    """Ensure current interpreter satisfies MIN_PYTHON, otherwise re-exec."""
-    if sys.version_info[:2] >= MIN_PYTHON:
-        return
-
-    py3 = _find_python3()
-    if not py3:
-        print(
-            "ERROR: Python {0}.{1}+ is required.".format(
-                MIN_PYTHON[0], MIN_PYTHON[1]
-            )
-        )
-        print(
-            "Current interpreter is {0}.{1}.{2}.".format(
-                sys.version_info[0], sys.version_info[1], sys.version_info[2]
-            )
-        )
-        print("Install a newer Python and rerun this command.")
-        raise SystemExit(1)
-
-    cmd = [py3, os.path.abspath(__file__)] + sys.argv[1:]
-    os.execvp(py3, cmd)
 
 
 def get_venv_python():
@@ -96,7 +40,9 @@ def ensure_venv():
 
 
 def main():
-    _ensure_python3()
+    if sys.version_info[:2] < MIN_PYTHON:
+        print(f"ERROR: Python {MIN_PYTHON[0]}.{MIN_PYTHON[1]}+ is required (current: {sys.version_info[0]}.{sys.version_info[1]})")
+        raise SystemExit(1)
 
     if len(sys.argv) < 2:
         print("Usage: python scripts/run.py <script_name> [args...]")
@@ -123,8 +69,8 @@ def main():
     script_path = os.path.join(skill_dir, "scripts", script_name)
 
     if not os.path.exists(script_path):
-        print("Script not found: {0}".format(script_name))
-        print("Looked for: {0}".format(script_path))
+        print(f"Script not found: {script_name}")
+        print(f"Looked for: {script_path}")
         raise SystemExit(1)
 
     venv_python = ensure_venv()
@@ -137,7 +83,7 @@ def main():
         print("\nInterrupted by user")
         raise SystemExit(130)
     except Exception as e:
-        print("Error: {0}".format(e))
+        print(f"Error: {e}")
         raise SystemExit(1)
 
 
