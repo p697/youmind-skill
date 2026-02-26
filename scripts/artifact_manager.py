@@ -68,11 +68,12 @@ def _find_tool_block(message: Dict[str, Any]) -> Dict[str, Any]:
 
 def _artifact_from_tool(tool_block: Dict[str, Any], include_raw_content: bool = False) -> Dict[str, Any]:
     tool_name = tool_block.get("tool_name")
+    tool_status = tool_block.get("status")
     tr = tool_block.get("tool_result") or {}
 
     result: Dict[str, Any] = {
         "tool_name": tool_name,
-        "tool_status": tool_block.get("status"),
+        "tool_status": tool_status,
         "artifact_type": "unknown",
         "urls": [],
         "media_ids": [],
@@ -82,6 +83,11 @@ def _artifact_from_tool(tool_block: Dict[str, Any], include_raw_content: bool = 
         "raw_content": None,
         "tool_result": tr,
     }
+
+    # If tool execution failed, return early with error info
+    if tool_status and tool_status != "success":
+        result["error"] = tr.get("error") or tr.get("message") or f"Tool {tool_name} status: {tool_status}"
+        return result
 
     if tool_name == "image_generate":
         result["artifact_type"] = "image"
