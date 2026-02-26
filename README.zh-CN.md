@@ -1,34 +1,32 @@
-# Youmind Skill (API-First)
+# Youmind Skill（API 优先）
 
-Use this skill to operate Youmind from local CLI/agents without manual browser workflows.
+这个 skill 用于在本地 CLI / AI 代理中直接操作 Youmind，避免手工浏览器流程。
 
-中文文档: `README.zh-CN.md`
+- 列出 / 查找 / 创建 boards
+- 向 board 添加链接、上传文件
+- 发起新会话、继续已有会话
+- 通过对话触发图片和幻灯片生成
+- 从聊天消息中提取生成产物（图片/幻灯片/文档）
 
-- List / find / create boards
-- Add links and upload files to boards
-- Start chats and continue existing chats
-- Trigger image and slides generation via chat
-- Extract generated artifacts (image/slides/doc) from chat payloads
+## 适用对象
 
-## Who This Is For
+适用于有本地 shell 执行能力的 AI 代理和开发者（Codex、Claude Code、OpenClaw 等）。
 
-This skill is for local AI agents and developers with shell access (Codex, Claude Code, OpenClaw, etc.).
+## 运行模型
 
-## Runtime Model
+- 业务能力全部通过 API 实现。
+- 浏览器仅用于认证初始化 / 刷新登录态。
+- 本地认证与会话信息保存在 `data/` 目录。
 
-- Business operations are API-only.
-- Browser is used only for authentication bootstrap/refresh.
-- Auth/session data is stored locally under `data/`.
-
-## Requirements
+## 环境要求
 
 - Python `3.10+`
-- Shell access
-- Network access to `youmind.com`
+- Shell 执行权限
+- 可访问 `youmind.com` 的网络
 
-`scripts/run.py` auto-creates `.venv` and installs dependencies on first run.
+首次运行时，`scripts/run.py` 会自动创建 `.venv` 并安装依赖。
 
-## Install
+## 安装
 
 ### Claude Code / Codex
 
@@ -48,16 +46,16 @@ git clone https://github.com/p697/youmind-skill.git
 cd youmind-skill
 ```
 
-## Quick Start (CLI)
+## 快速开始（CLI）
 
-### 1. Authenticate once
+### 1. 首次认证
 
 ```bash
 python scripts/run.py auth_manager.py setup
 python scripts/run.py auth_manager.py validate
 ```
 
-### 2. List and create boards
+### 2. 列出并创建 board
 
 ```bash
 python scripts/run.py board_manager.py list
@@ -65,14 +63,14 @@ python scripts/run.py board_manager.py create --name "Demo Board"
 python scripts/run.py board_manager.py find --query "demo"
 ```
 
-### 3. Add materials
+### 3. 添加资料
 
 ```bash
 python scripts/run.py material_manager.py add-link --board-id <board-id> --url "https://example.com"
 python scripts/run.py material_manager.py upload-file --board-id <board-id> --file /path/to/file.pdf
 ```
 
-### 4. Chat and generate
+### 4. 对话与生成
 
 ```bash
 python scripts/run.py chat_manager.py create --board-id <board-id> --message "Summarize key points"
@@ -80,7 +78,7 @@ python scripts/run.py chat_manager.py generate-image --board-id <board-id> --pro
 python scripts/run.py chat_manager.py generate-slides --board-id <board-id> --prompt "6-slide project update"
 ```
 
-### 5. Extract artifacts from chat
+### 5. 提取生成产物
 
 ```bash
 python scripts/run.py artifact_manager.py extract --chat-id <chat-id>
@@ -88,14 +86,14 @@ python scripts/run.py artifact_manager.py extract-latest --board-id <board-id>
 python scripts/run.py artifact_manager.py extract --chat-id <chat-id> --include-raw-content
 ```
 
-## Capabilities
+## 能力清单
 
 ### Boards
 
-- `list`: list all boards
-- `find`: search boards by keyword
-- `get`: board detail by id
-- `create`: create a new board
+- `list`：列出所有 boards
+- `find`：按关键词搜索 boards
+- `get`：按 id 获取 board 详情
+- `create`：创建新 board
 
 ```bash
 python scripts/run.py board_manager.py list
@@ -106,10 +104,10 @@ python scripts/run.py board_manager.py create --name "My Board" --prompt "Initia
 
 ### Materials
 
-- Add URL to a board
-- Upload file to a board
-- Query snips by ids
-- List board picks
+- 向 board 添加 URL
+- 上传本地文件到 board
+- 按 ids 查询 snips
+- 列出 board picks
 
 ```bash
 python scripts/run.py material_manager.py add-link --board-id <board-id> --url "https://example.com"
@@ -121,10 +119,10 @@ python scripts/run.py material_manager.py list-picks --board-id <board-id>
 
 ### Chat
 
-- Create chat and send follow-up messages
-- List history and fetch details
-- Mark chat as read
-- Generate image/slides via prompt
+- 创建会话并发送追问
+- 获取历史与详情
+- 将会话标记为已读
+- 通过 prompt 生成图片/幻灯片
 
 ```bash
 python scripts/run.py chat_manager.py create --board-id <board-id> --message "Summarize this board"
@@ -138,25 +136,25 @@ python scripts/run.py chat_manager.py generate-slides --board-id <board-id> --pr
 
 ### Artifacts
 
-`artifact_manager.py` parses assistant tool blocks from chat details:
+`artifact_manager.py` 会解析 chat detail 中 assistant 的 tool block：
 
-- `image_generate` -> image URLs + media ids
-- `slides_generate` -> per-slide image URLs + media ids
-- `write` -> document page id + content preview (+ raw content if requested)
+- `image_generate`：返回图片 URLs 和 media ids
+- `slides_generate`：返回每页幻灯片的图片 URLs 和 media ids
+- `write`：返回文档 page id、内容预览（加 `--include-raw-content` 可拿原始内容）
 
-## Agent Usage Examples
+## 代理交互示例
 
-You can ask your agent:
+你可以直接对代理说：
 
-- "List all my Youmind boards"
-- "Find board named roadmap"
-- "Create a board called GTM Plan"
-- "Add this link to board <id>: https://example.com"
-- "Generate an image in board <id>: minimalist launch poster"
-- "Generate slides in board <id>: quarterly product update"
-- "Extract the latest generated artifact in board <id>"
+- “列出我所有的 Youmind boards”
+- “找下名字里有 roadmap 的 board”
+- “创建一个叫 GTM Plan 的 board”
+- “把这个链接加到 board <id>：https://example.com”
+- “在 board <id> 里生成一张极简海报图”
+- “在 board <id> 里生成一份季度汇报 slides”
+- “提取 board <id> 最近一次生成结果”
 
-## Project Structure
+## 项目结构
 
 ```text
 SKILL.md
@@ -176,16 +174,16 @@ references/
   integration_api_discovery.md
   integration_plan_from_live_product.md
   troubleshooting.md
-data/ (generated locally)
+data/ (本地生成)
 ```
 
-## Limitations
+## 当前限制
 
-- API surface may change as Youmind updates backend contracts
-- Session may expire and require `auth_manager.py reauth`
-- Slide generation currently exposes slide image assets, not direct `.pptx` download URL
+- Youmind 后端 API 变更时，接口字段可能漂移
+- 登录态可能过期，需要执行 `auth_manager.py reauth`
+- 幻灯片生成目前返回的是每页图片资产，不是直接 `.pptx` 下载链接
 
-## Troubleshooting
+## 排障
 
 ```bash
 python scripts/run.py auth_manager.py status
@@ -193,16 +191,16 @@ python scripts/run.py auth_manager.py validate
 python scripts/run.py auth_manager.py reauth
 ```
 
-References:
+参考文档：
 
 - `references/api_reference.md`
 - `references/troubleshooting.md`
 
-## Security
+## 安全说明
 
-- `data/` contains session/auth information and should never be committed
-- Use a dedicated account if your org requires separation for automation
+- `data/` 目录包含会话/认证信息，禁止提交到代码仓库
+- 如组织要求隔离，请使用专门的自动化账号
 
 ## License
 
-MIT (`LICENSE`)
+MIT（见 `LICENSE`）

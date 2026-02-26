@@ -34,6 +34,14 @@ python scripts/run.py chat_manager.py generate-image --board-id BOARD_ID --promp
 python scripts/run.py chat_manager.py generate-slides --board-id BOARD_ID --prompt "..."
 ```
 
+## `artifact_manager.py`
+
+```bash
+python scripts/run.py artifact_manager.py extract --chat-id CHAT_ID
+python scripts/run.py artifact_manager.py extract-latest --board-id BOARD_ID
+python scripts/run.py artifact_manager.py extract --chat-id CHAT_ID --include-raw-content
+```
+
 ## `ask_question.py` (compatibility wrapper)
 
 ```bash
