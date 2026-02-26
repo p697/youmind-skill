@@ -2,7 +2,7 @@
 
 Use this skill to operate Youmind from local CLI/agents without manual browser workflows.
 
-中文文档: `README.zh-CN.md`
+中文文档: [README.zh-CN.md](./README.zh-CN.md)
 
 - List / find / create boards
 - Add links and upload files to boards
