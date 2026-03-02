@@ -124,21 +124,24 @@ def _fetch_from_cdp() -> Optional[str]:
 
 def _open_signin_tab() -> bool:
     """
-    Open youmind.com/sign-in in the OpenClaw browser via Playwright CDP.
-    Creates a new tab in the existing browser session.
+    Open youmind.com/sign-in in the OpenClaw browser via the openclaw CLI.
+    Uses `openclaw browser open <url>` — the same command used by the
+    browser tool internally. Works cross-platform wherever openclaw is installed.
     Returns True if the tab was opened successfully.
     """
+    import subprocess
+    import shutil
     try:
-        from patchright.sync_api import sync_playwright
-        with sync_playwright() as p:
-            browser = p.chromium.connect_over_cdp(CDP_HTTP)
-            contexts = browser.contexts
-            if not contexts:
-                return False
-            page = contexts[0].new_page()
-            page.goto("https://youmind.com/sign-in", wait_until="domcontentloaded", timeout=10000)
-            # Leave the tab open for user interaction; don't close it
-        return True
+        if not shutil.which("openclaw"):
+            print("[cdp_auth] openclaw CLI not found in PATH", file=sys.stderr)
+            return False
+        result = subprocess.run(
+            ["openclaw", "browser", "open",
+             "--browser-profile", "openclaw",
+             "https://youmind.com/sign-in"],
+            capture_output=True, text=True, timeout=10
+        )
+        return result.returncode == 0
     except Exception as exc:
         print(f"[cdp_auth] Could not open sign-in tab: {exc}", file=sys.stderr)
         return False
