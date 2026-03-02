@@ -124,15 +124,20 @@ def _fetch_from_cdp() -> Optional[str]:
 
 def _open_signin_tab() -> bool:
     """
-    Open youmind.com/sign-in in the OpenClaw browser via CDP REST API.
-    Uses HTTP only (no WebSocket) — always safe to call.
+    Open youmind.com/sign-in in the OpenClaw browser via Playwright CDP.
+    Creates a new tab in the existing browser session.
     Returns True if the tab was opened successfully.
     """
     try:
-        signin_url = "https://youmind.com/sign-in"
-        urllib.request.urlopen(
-            f"{CDP_HTTP}/json/new?{signin_url}", timeout=5
-        )
+        from patchright.sync_api import sync_playwright
+        with sync_playwright() as p:
+            browser = p.chromium.connect_over_cdp(CDP_HTTP)
+            contexts = browser.contexts
+            if not contexts:
+                return False
+            page = contexts[0].new_page()
+            page.goto("https://youmind.com/sign-in", wait_until="domcontentloaded", timeout=10000)
+            # Leave the tab open for user interaction; don't close it
         return True
     except Exception as exc:
         print(f"[cdp_auth] Could not open sign-in tab: {exc}", file=sys.stderr)
