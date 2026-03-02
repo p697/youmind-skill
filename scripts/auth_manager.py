@@ -41,7 +41,19 @@ class AuthManager:
         self.browser_state_dir = BROWSER_STATE_DIR
 
     def is_authenticated(self) -> bool:
-        """Return True if local auth state file exists."""
+        """Return True if cookies are available via CDP or state.json."""
+        # Prefer CDP: if the OpenClaw browser is running with a valid YouMind session,
+        # authentication is always available regardless of state.json age.
+        try:
+            import sys as _sys, os as _os
+            _sys.path.insert(0, _os.path.dirname(__file__))
+            from cdp_auth import is_cdp_available, get_cdp_cookie_str
+            if is_cdp_available() and get_cdp_cookie_str():
+                return True
+        except Exception:
+            pass
+
+        # Fall back to state.json
         if not self.state_file.exists():
             return False
 
@@ -58,6 +70,22 @@ class AuthManager:
             "state_file": str(self.state_file),
             "state_exists": self.state_file.exists(),
         }
+
+        # CDP status
+        try:
+            import sys as _sys, os as _os
+            _sys.path.insert(0, _os.path.dirname(__file__))
+            from cdp_auth import is_cdp_available, CACHE_FILE
+            info["cdp_available"] = is_cdp_available()
+            if CACHE_FILE.exists():
+                import json as _json
+                cache = _json.loads(CACHE_FILE.read_text())
+                info["cdp_cache_age_hours"] = (time.time() - cache.get("saved_at", 0)) / 3600
+            else:
+                info["cdp_cache_age_hours"] = None
+        except Exception:
+            info["cdp_available"] = False
+            info["cdp_cache_age_hours"] = None
 
         if self.auth_info_file.exists():
             try:
