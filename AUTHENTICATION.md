@@ -1,5 +1,39 @@
 # Authentication Architecture (Youmind Skill)
 
+## Dynamic Cookie Mode (Recommended for OpenClaw Users)
+
+If you run the [OpenClaw](https://openclaw.ai) browser alongside this skill, **you only need to log in once**. After that, cookies are fetched automatically from the running browser — no manual re-authentication required.
+
+### How it works
+
+1. The skill connects to the OpenClaw browser via Chrome DevTools Protocol (CDP) at `http://127.0.0.1:18800`
+2. Reads fresh YouMind cookies using `Network.getAllCookies`
+3. Caches them locally in `data/cdp_cache.json` with a **5-hour TTL**
+4. On cache expiry, silently re-fetches from the browser
+
+### Prerequisites
+
+- OpenClaw browser must be running (it starts automatically with the OpenClaw gateway)
+- You must have logged into YouMind **at least once** in the OpenClaw browser
+
+### Check status
+
+```bash
+python3 scripts/cdp_auth.py --status
+```
+
+### Force refresh cache
+
+```bash
+python3 scripts/cdp_auth.py --refresh
+```
+
+---
+
+## Fallback: Manual Login (state.json)
+
+If the OpenClaw browser is not available, the skill falls back to `state.json` — a cookie snapshot saved after a one-time manual login:
+
 ## Overview
 
 This skill uses a hybrid auth strategy:
