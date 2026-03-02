@@ -45,14 +45,15 @@ class YoumindApiClient:
         return _board_id_from_url(board_url)
 
     def _load_cookie_header(self) -> str:
-        # 1. Try dynamic CDP cookie fetching (OpenClaw browser at port 18800).
-        #    This avoids manual re-auth: cookies are always fresh from the live browser.
+        # 1. Try dynamic CDP cookie fetching (OpenClaw browser).
+        #    Cookies are always fresh from the live browser; no manual re-auth needed.
+        #    On first use with no session, opens the sign-in page and waits for login.
         try:
             import sys as _sys
             import os as _os
             _sys.path.insert(0, _os.path.dirname(__file__))
-            from cdp_auth import get_cdp_cookie_str
-            cookie_str = get_cdp_cookie_str()
+            from cdp_auth import ensure_authenticated
+            cookie_str = ensure_authenticated(interactive=True)
             if cookie_str:
                 return cookie_str
         except Exception:
