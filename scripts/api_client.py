@@ -104,7 +104,7 @@ class YoumindApiClient:
                 "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
                 "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36"
             ),
-            "x-client-type": "web",
+            "x-client-type": "youmind-skill",
             "x-time-zone": self.timezone,
             "cookie": self._cookie_header,
         }
