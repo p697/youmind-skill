@@ -254,6 +254,32 @@ class YoumindApiClient:
             "material": text_file,
         }
 
+    # Note APIs
+    def create_note(
+        self,
+        content_plain: str,
+        title: Optional[str] = None,
+        board_id: Optional[str] = None,
+        gen_title: bool = False,
+        parent_board_group_id: Optional[str] = None,
+    ) -> Any:
+        payload: Dict[str, Any] = {"contentPlain": content_plain}
+        if title:
+            payload["title"] = title
+        if board_id:
+            payload["boardId"] = board_id
+        if gen_title:
+            payload["genTitle"] = True
+        if parent_board_group_id:
+            payload["parentBoardGroupId"] = parent_board_group_id
+        return self._try_json(self._post("/api/v1/createThoughtWithPlain", payload))
+
+    def get_note(self, note_id: str) -> Any:
+        return self._try_json(self._post("/api/v1/getThought", {"id": note_id}))
+
+    def list_notes(self) -> Any:
+        return self._try_json(self._post("/api/v1/listThoughts", {}))
+
     # Chat APIs
     def create_chat(
         self,
