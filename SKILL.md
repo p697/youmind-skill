@@ -1,6 +1,6 @@
 ---
 name: youmind
-description: Use this skill when users need Youmind board operations via API (list/find/create boards, add links/files, chat, generate image/slides/docs, extract artifacts). Browser is only for auth bootstrap/refresh.
+description: Use this skill when users need Youmind board operations via API (list/find/create boards, add links/files/notes, chat, generate image/slides/docs, extract artifacts). Browser is only for auth bootstrap/refresh.
 ---
 
 # Youmind API Skill (API-Only Runtime)
@@ -47,6 +47,22 @@ python3 scripts/run.py material_manager.py upload-file --board-id <board-id> --f
 python3 scripts/run.py material_manager.py get-snips --ids "<snip-id-1>,<snip-id-2>"
 
 python3 scripts/run.py material_manager.py list-picks --board-id <board-id>
+```
+
+## Note Commands
+
+```bash
+# Create a note (plain text, optionally attached to a board)
+python3 scripts/run.py note_manager.py create --content "Your note content" --title "Optional title" --board-id <board-id>
+
+# Let AI generate a title from content
+python3 scripts/run.py note_manager.py create --content "Your note content" --board-id <board-id> --gen-title
+
+# Get a note by ID
+python3 scripts/run.py note_manager.py get --id <note-id>
+
+# List all notes in the space
+python3 scripts/run.py note_manager.py list
 ```
 
 ## Chat Commands
