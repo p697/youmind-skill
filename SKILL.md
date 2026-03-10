@@ -1,6 +1,6 @@
 ---
 name: youmind
-description: Use this skill when users need Youmind board operations via API (list/find/create boards, add links/files, chat, generate image/slides/docs, extract artifacts). Browser is only for auth bootstrap/refresh.
+description: Use this skill when users need Youmind board operations via API (list/find/create boards, add links/files/notes, chat, generate image/slides/docs, extract artifacts). Browser is only for auth bootstrap/refresh.
 ---
 
 # Youmind API Skill (API-Only Runtime)
@@ -47,6 +47,36 @@ python3 scripts/run.py material_manager.py upload-file --board-id <board-id> --f
 python3 scripts/run.py material_manager.py get-snips --ids "<snip-id-1>,<snip-id-2>"
 
 python3 scripts/run.py material_manager.py list-picks --board-id <board-id>
+```
+
+## Note & Craft Commands
+
+> **Note vs Craft:** `create` creates a *note* (type: `note`, simpler format). `create-craft` creates a *craft document* (type: `page`, full rich-text editor, appears as "Document" in the board UI). Prefer `create-craft` when you want a document that looks like a native YouMind document.
+
+## Note Commands
+
+```bash
+# Create a note (plain text, optionally attached to a board)
+python3 scripts/run.py note_manager.py create --content "Your note content" --title "Optional title" --board-id <board-id>
+
+# Let AI generate a title from content
+python3 scripts/run.py note_manager.py create --content "Your note content" --board-id <board-id> --gen-title
+
+# Get a note by ID
+python3 scripts/run.py note_manager.py get --id <note-id>
+
+# List all notes in the space
+python3 scripts/run.py note_manager.py list
+
+## Craft Document Commands
+
+```bash
+# Create a craft document (type: page) — appears as a Document in the board UI
+python3 scripts/run.py note_manager.py create-craft \
+  --content "Your document content (markdown supported)" \
+  --title "Document Title" \
+  --board-id <board-id>
+```
 ```
 
 ## Chat Commands

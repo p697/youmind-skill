@@ -254,6 +254,82 @@ class YoumindApiClient:
             "material": text_file,
         }
 
+    # Note APIs
+    def create_note(
+        self,
+        content_plain: str,
+        title: Optional[str] = None,
+        board_id: Optional[str] = None,
+        gen_title: bool = False,
+        parent_board_group_id: Optional[str] = None,
+    ) -> Any:
+        payload: Dict[str, Any] = {"contentPlain": content_plain}
+        if title:
+            payload["title"] = title
+        if board_id:
+            payload["boardId"] = board_id
+        if gen_title:
+            payload["genTitle"] = True
+        if parent_board_group_id:
+            payload["parentBoardGroupId"] = parent_board_group_id
+        return self._try_json(self._post("/api/v1/createThoughtWithPlain", payload))
+
+    def get_note(self, note_id: str) -> Any:
+        return self._try_json(self._post("/api/v1/getThought", {"id": note_id}))
+
+    def list_notes(self) -> Any:
+        return self._try_json(self._post("/api/v1/listThoughts", {}))
+
+    # Craft (Document/Page) APIs
+    def create_craft(
+        self,
+        board_id: str,
+        content_plain: str,
+        title: Optional[str] = None,
+    ) -> Any:
+        """Create a craft document (type: page) in a board with proper markdown rendering.
+
+        Uses a local Node.js script (scripts/md_to_base64.mjs) to convert markdown to
+        Yjs binary base64 client-side, then calls POST /api/v1/createPage directly with
+        the proper { raw, plain } content format.
+
+        Markdown is fully supported: headings, bold/italic, lists, tables, code blocks, etc.
+
+        Args:
+            board_id: Target board ID.
+            content_plain: Markdown content string.
+            title: Optional document title.
+        """
+        import subprocess
+        import os
+
+        script = Path(__file__).parent / "md_to_base64.mjs"
+        if not script.exists():
+            raise ApiError(f"md_to_base64.mjs not found at {script}")
+
+        result = subprocess.run(
+            ["node", str(script)],
+            input=content_plain,
+            capture_output=True,
+            text=True,
+            timeout=30,
+            cwd=str(script.parent.parent),
+        )
+        if result.returncode != 0:
+            raise ApiError(f"md_to_base64.mjs failed: {result.stderr.strip()}")
+
+        raw_base64 = result.stdout.strip()
+
+        payload: Dict[str, Any] = {
+            "boardId": board_id,
+            "title": title or "",
+            "content": {
+                "raw": raw_base64,
+                "plain": content_plain,
+            },
+        }
+        return self._try_json(self._post("/api/v1/createPage", payload))
+
     # Chat APIs
     def create_chat(
         self,
