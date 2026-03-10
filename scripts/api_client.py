@@ -260,6 +260,30 @@ class YoumindApiClient:
     def list_notes(self) -> Any:
         return self._try_json(self._post("/api/v1/listThoughts", {}))
 
+    # Craft (Document/Page) APIs
+    def create_craft(
+        self,
+        board_id: str,
+        content_plain: str,
+        title: Optional[str] = None,
+    ) -> Any:
+        """Create a craft document (type: page) in a board.
+
+        Uses /openapi/v1/createDocument which accepts plain text content and
+        converts it to Yjs format server-side. Returns a PageDto with type='page'.
+
+        Args:
+            board_id: Target board ID.
+            content_plain: Plain text content (markdown supported).
+            title: Optional document title. Defaults to empty string if not provided.
+        """
+        payload: Dict[str, Any] = {
+            "boardId": board_id,
+            "title": title or "",
+            "content": content_plain,
+        }
+        return self._try_json(self._post("/openapi/v1/createDocument", payload))
+
     # Chat APIs
     def create_chat(
         self,

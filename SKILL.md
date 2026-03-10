@@ -49,6 +49,10 @@ python3 scripts/run.py material_manager.py get-snips --ids "<snip-id-1>,<snip-id
 python3 scripts/run.py material_manager.py list-picks --board-id <board-id>
 ```
 
+## Note & Craft Commands
+
+> **Note vs Craft:** `create` creates a *note* (type: `note`, simpler format). `create-craft` creates a *craft document* (type: `page`, full rich-text editor, appears as "Document" in the board UI). Prefer `create-craft` when you want a document that looks like a native YouMind document.
+
 ## Note Commands
 
 ```bash
@@ -63,6 +67,16 @@ python3 scripts/run.py note_manager.py get --id <note-id>
 
 # List all notes in the space
 python3 scripts/run.py note_manager.py list
+
+## Craft Document Commands
+
+```bash
+# Create a craft document (type: page) — appears as a Document in the board UI
+python3 scripts/run.py note_manager.py create-craft \
+  --content "Your document content (markdown supported)" \
+  --title "Document Title" \
+  --board-id <board-id>
+```
 ```
 
 ## Chat Commands

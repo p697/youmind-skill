@@ -1,10 +1,11 @@
 """
-note_manager.py — manage YouMind notes (thoughts) via API
+note_manager.py — manage YouMind notes and craft documents via API
 
 Commands:
-  create   Create a new note with plain text content
-  get      Get a note by ID
-  list     List all notes in the space
+  create        Create a new note (type: note) with plain text content
+  get           Get a note by ID
+  list          List all notes in the space
+  create-craft  Create a craft document (type: page) with plain text content
 """
 
 import argparse
@@ -37,15 +38,25 @@ def cmd_list(args: argparse.Namespace) -> None:
     print(json.dumps(result, ensure_ascii=False, indent=2))
 
 
+def cmd_create_craft(args: argparse.Namespace) -> None:
+    api = YoumindApiClient()
+    result = api.create_craft(
+        board_id=args.board_id,
+        content_plain=args.content,
+        title=args.title or None,
+    )
+    print(json.dumps(result, ensure_ascii=False, indent=2))
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Manage YouMind notes (thoughts) via API"
+        description="Manage YouMind notes and craft documents via API"
     )
     subparsers = parser.add_subparsers(dest="command")
     subparsers.required = True
 
-    # create
-    p_create = subparsers.add_parser("create", help="Create a new note")
+    # create (note)
+    p_create = subparsers.add_parser("create", help="Create a new note (type: note)")
     p_create.add_argument("--content", required=True, help="Plain text content of the note")
     p_create.add_argument("--title", default="", help="Note title (optional, max 60 chars)")
     p_create.add_argument("--board-id", dest="board_id", default="", help="Associate with a board ID")
@@ -66,6 +77,16 @@ def main() -> None:
     # list
     p_list = subparsers.add_parser("list", help="List all notes in the space")
     p_list.set_defaults(func=cmd_list)
+
+    # create-craft (document/page)
+    p_craft = subparsers.add_parser(
+        "create-craft",
+        help="Create a craft document (type: page) — richer editor, appears as Document in board",
+    )
+    p_craft.add_argument("--content", required=True, help="Plain text content (markdown supported)")
+    p_craft.add_argument("--title", default="", help="Document title")
+    p_craft.add_argument("--board-id", dest="board_id", required=True, help="Target board ID")
+    p_craft.set_defaults(func=cmd_create_craft)
 
     args = parser.parse_args()
     try:
