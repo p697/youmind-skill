@@ -267,22 +267,48 @@ class YoumindApiClient:
         content_plain: str,
         title: Optional[str] = None,
     ) -> Any:
-        """Create a craft document (type: page) in a board.
+        """Create a craft document (type: page) in a board with proper markdown rendering.
 
-        Uses /openapi/v1/createDocument which accepts plain text content and
-        converts it to Yjs format server-side. Returns a PageDto with type='page'.
+        Uses a local Node.js script (scripts/md_to_base64.mjs) to convert markdown to
+        Yjs binary base64 client-side, then calls POST /api/v1/createPage directly with
+        the proper { raw, plain } content format.
+
+        Markdown is fully supported: headings, bold/italic, lists, tables, code blocks, etc.
 
         Args:
             board_id: Target board ID.
-            content_plain: Plain text content (markdown supported).
-            title: Optional document title. Defaults to empty string if not provided.
+            content_plain: Markdown content string.
+            title: Optional document title.
         """
+        import subprocess
+        import os
+
+        script = Path(__file__).parent / "md_to_base64.mjs"
+        if not script.exists():
+            raise ApiError(f"md_to_base64.mjs not found at {script}")
+
+        result = subprocess.run(
+            ["node", str(script)],
+            input=content_plain,
+            capture_output=True,
+            text=True,
+            timeout=30,
+            cwd=str(script.parent.parent),
+        )
+        if result.returncode != 0:
+            raise ApiError(f"md_to_base64.mjs failed: {result.stderr.strip()}")
+
+        raw_base64 = result.stdout.strip()
+
         payload: Dict[str, Any] = {
             "boardId": board_id,
             "title": title or "",
-            "content": content_plain,
+            "content": {
+                "raw": raw_base64,
+                "plain": content_plain,
+            },
         }
-        return self._try_json(self._post("/openapi/v1/createDocument", payload))
+        return self._try_json(self._post("/api/v1/createPage", payload))
 
     # Chat APIs
     def create_chat(
